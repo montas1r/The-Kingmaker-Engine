@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Kingmaker Engine - Custom Network Visualizer</title>
+    <title>The Kingmaker Engine - Scenario Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,6 +33,17 @@
         </div>
 
         <div class="control-section">
+            <div class="panel-card">
+                <h2>Preset Scenarios</h2>
+                <select id="scenarioPresetSelect" style="width: 100%; margin-bottom: 0.5rem;">
+                    <option value="custom">Custom Configuration</option>
+                    <option value="corporate">Corporate Pyramid (Waterfall)</option>
+                    <option value="tribal">Tribal Echo Chambers</option>
+                    <option value="duopoly">Bipartisan Duopoly</option>
+                </select>
+                <p id="scenarioDesc" style="font-size: 0.8rem; color: var(--text-muted); italic">Select a preset to inject historical structural layouts.</p>
+            </div>
+
             <div class="panel-card">
                 <h2>Network Configuration</h2>
                 <div class="config-row">

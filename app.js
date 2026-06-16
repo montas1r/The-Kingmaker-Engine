@@ -4,7 +4,6 @@ let currentPhase = 1;
 let state = {};
 let nodePositions = {};
 
-// Canvas geometry variables
 const width = 600;
 const height = 500;
 const centerX = width / 2;
@@ -12,21 +11,40 @@ const centerY = height / 2;
 const radius = 170;
 const nodeRadius = 24;
 
-// Generate identifiers dynamically based on user selection size
-function setupPopulation(n) {
+// Preset Scenarios Data Dictionary
+const presets = {
+    corporate: {
+        size: 7,
+        desc: "Hierarchical Cascade: Low ranks funnel power upwards. The absolute peak executive points back to a baseline node, flipping the structure.",
+        votes: { 'A':'G', 'B':'A', 'C':'A', 'D':'B', 'E':'B', 'F':'C', 'G':'D' }
+    },
+    tribal: {
+        size: 8,
+        desc: "Echo Chambers: Faction 1 (A,B,C) locks a permanent balanced loop. Faction 2 routes all votes into dictator E, whose power shifts away.",
+        votes: { 'A':'B', 'B':'C', 'C':'A', 'D':'A', 'E':'F', 'F':'G', 'G':'H', 'H':'E' }
+    },
+    duopoly: {
+        size: 6,
+        desc: "Bipartisan Duopoly: Members split backing to two primary figures. Those two primary figures vote exclusively for each other, locking out the room.",
+        votes: { 'A':'B', 'B':'A', 'C':'A', 'D':'A', 'E':'B', 'F':'B' }
+    }
+};
+
+function setupPopulation(n, presetVotes = null) {
     peopleIds = [];
     state = {};
     
     for (let i = 0; i < n; i++) {
-        // Fallback to P1, P2 style strings if n goes past English character limits
         const id = n <= 26 ? String.fromCharCode(65 + i) : `P${i+1}`;
         peopleIds.push(id);
     }
 
-    // Default connection loop behavior to prevent broken rendering on initialization
     peopleIds.forEach((id, index) => {
-        const nextTarget = peopleIds[(index + 1) % peopleIds.length];
-        state[id] = { votesFor: nextTarget, p1Score: 0, p2Score: 0, rank: 1 };
+        let target = peopleIds[(index + 1) % peopleIds.length];
+        if (presetVotes && presetVotes[id]) {
+            target = presetVotes[id];
+        }
+        state[id] = { votesFor: target, p1Score: 0, p2Score: 0, rank: 1 };
     });
 
     recalculateGeometry();
@@ -43,7 +61,6 @@ function recalculateGeometry() {
     });
 }
 
-// Initialize UI Elements Dropdown Inputs
 function initControls() {
     const container = document.getElementById('voteInputsContainer');
     container.innerHTML = '';
@@ -70,6 +87,8 @@ function initControls() {
 
         select.addEventListener('change', (e) => {
             state[id].votesFor = e.target.value;
+            document.getElementById('scenarioPresetSelect').value = 'custom';
+            document.getElementById('scenarioDesc').innerText = "Custom user layout configuration.";
             calculateSystemState();
             render();
         });
@@ -80,7 +99,6 @@ function initControls() {
     });
 }
 
-// Calculation System Core Logic
 function calculateSystemState() {
     peopleIds.forEach(id => {
         state[id].p1Score = 0;
@@ -104,15 +122,28 @@ function calculateSystemState() {
     });
 }
 
+function applyPreset(presetKey) {
+    if (presetKey === 'custom') return;
+    const preset = presets[presetKey];
+    
+    document.getElementById('groupSizeInput').value = preset.size;
+    document.getElementById('scenarioDesc').innerText = preset.desc;
+    
+    setupPopulation(preset.size, preset.votes);
+    initControls();
+    calculateSystemState();
+    render();
+}
+
 function togglePhase() {
     if (currentPhase === 1) {
         currentPhase = 2;
         document.getElementById('togglePhaseBtn').innerText = 'Back to Phase 1';
         document.getElementById('phaseBadge').innerText = 'Phase 2: Weighted Flow';
         document.getElementById('phaseBadge').className = 'phase-indicator phase-2-badge';
-        document.getElementById('helpText').innerText = 'Phase 2 Active. Handles locked paths. Arrow sizes scale matching Phase 1 baseline values.';
         document.getElementById('groupSizeInput').disabled = true;
         document.getElementById('updateSizeBtn').disabled = true;
+        document.getElementById('scenarioPresetSelect').disabled = true;
         
         peopleIds.forEach(id => {
             document.getElementById(`select-${id}`).disabled = true;
@@ -122,9 +153,9 @@ function togglePhase() {
         document.getElementById('togglePhaseBtn').innerText = 'Run Phase 2';
         document.getElementById('phaseBadge').innerText = 'Phase 1: Raw Seeds';
         document.getElementById('phaseBadge').className = 'phase-indicator phase-1-badge';
-        document.getElementById('helpText').innerText = 'Phase 1 Active. Configure raw configurations manually.';
         document.getElementById('groupSizeInput').disabled = false;
         document.getElementById('updateSizeBtn').disabled = false;
+        document.getElementById('scenarioPresetSelect').disabled = false;
         
         peopleIds.forEach(id => {
             document.getElementById(`select-${id}`).disabled = false;
@@ -140,14 +171,19 @@ function resetSimulation() {
     document.getElementById('phaseBadge').className = 'phase-indicator phase-1-badge';
     document.getElementById('groupSizeInput').disabled = false;
     document.getElementById('updateSizeBtn').disabled = false;
+    document.getElementById('scenarioPresetSelect').disabled = false;
     
-    setupPopulation(parseInt(document.getElementById('groupSizeInput').value) || 6);
-    initControls();
-    calculateSystemState();
-    render();
+    const currentPreset = document.getElementById('scenarioPresetSelect').value;
+    if (currentPreset !== 'custom') {
+        applyPreset(currentPreset);
+    } else {
+        setupPopulation(parseInt(document.getElementById('groupSizeInput').value) || 6);
+        initControls();
+        calculateSystemState();
+        render();
+    }
 }
 
-// Render Graphics Engine
 function render() {
     const linksGroup = document.getElementById('linksGroup');
     const nodesGroup = document.getElementById('nodesGroup');
@@ -213,7 +249,7 @@ function render() {
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('fill', '#ffffff');
         label.setAttribute('font-weight', 'bold');
-        label.setAttribute('font-size', '12px');
+        label.setAttribute('font-size', '11px');
         label.textContent = id;
 
         const valText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -257,7 +293,6 @@ function render() {
     });
 }
 
-// Global Event Listeners Setup
 window.onload = () => {
     setupPopulation(6);
     initControls();
@@ -266,7 +301,10 @@ window.onload = () => {
 
     document.getElementById('togglePhaseBtn').addEventListener('click', togglePhase);
     document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+    document.getElementById('scenarioPresetSelect').addEventListener('change', (e) => applyPreset(e.target.value));
     document.getElementById('updateSizeBtn').addEventListener('click', () => {
+        document.getElementById('scenarioPresetSelect').value = 'custom';
+        document.getElementById('scenarioDesc').innerText = "Custom user layout configuration.";
         const sizeInput = document.getElementById('groupSizeInput');
         let val = parseInt(sizeInput.value);
         if (isNaN(val) || val < 3) val = 3;
