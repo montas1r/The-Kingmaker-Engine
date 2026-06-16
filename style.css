@@ -1,76 +1,178 @@
 :root {
-    --bg-color: #0f172a;
-    --panel-bg: #1e293b;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --accent-p1: #38bdf8;
-    --accent-p2: #fbbf24;
-    --node-bg: #334155;
-    --border-color: #475569;
+    --bg-main: #090d16;
+    --bg-panel: #111827;
+    --border-flat: #1f2937;
+    --text-primary: #f8fafc;
+    --text-muted: #64748b;
+    --color-p1: #f8fafc;
+    --color-p2: #3b82f6;
+    --node-fill: #1f2937;
 }
 
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-primary);
 }
 
 body {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    display: flex;
-    flex-direction: column;
+    background-color: var(--bg-main);
     height: 100vh;
     overflow: hidden;
 }
 
-header {
-    background-color: var(--panel-bg);
-    padding: 1rem 2rem;
-    border-bottom: 1px solid var(--border-color);
+.app-shell {
+    display: grid;
+    grid-template-columns: 320px 1fr 340px;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* SIDEBAR LAYOUTS */
+.sidebar-left, .sidebar-right {
+    background-color: var(--bg-panel);
+    border-right: 1px solid var(--border-flat);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-header h1 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-}
-
-.phase-indicator {
-    padding: 0.5rem 1rem;
-    border-radius: 9999px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    transition: all 0.3s ease;
-}
-
-.phase-1-badge {
-    background-color: rgba(56, 189, 248, 0.2);
-    color: var(--accent-p1);
-    border: 1px solid var(--accent-p1);
-}
-
-.phase-2-badge {
-    background-color: rgba(251, 191, 36, 0.2);
-    color: var(--accent-p2);
-    border: 1px solid var(--accent-p2);
-}
-
-.main-container {
-    display: flex;
-    flex: 1;
+    flex-direction: column;
+    padding: 1.5rem;
+    gap: 1.5rem;
     overflow: hidden;
 }
 
-.canvas-section {
-    flex: 3;
+.sidebar-right {
+    border-right: none;
+    border-left: 1px solid var(--border-flat);
+}
+
+.brand {
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-flat);
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.control-group.scrollable {
+    flex: 1;
+    overflow-y: auto;
+}
+
+label, .panel-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
+.meta-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* FORMS & ACTION TRIDENTS */
+input, select {
+    width: 100%;
+    background: var(--bg-main);
+    border: 1px solid var(--border-flat);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.input-row input {
+    width: 70px;
+}
+
+.dual-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+button {
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.btn-flat {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-flat);
+    padding: 0.5rem 1rem;
+    flex: 1;
+}
+
+.btn-flat:hover:not(:disabled) {
+    background: var(--bg-main);
+}
+
+.btn-action {
+    background: var(--text-primary);
+    color: var(--bg-main);
+    border: none;
+    padding: 0.75rem;
+    width: 100%;
+}
+
+.btn-action:hover:not(:disabled) {
+    background: #e2e8f0;
+}
+
+button:disabled, select:disabled, input:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+.vote-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    border-bottom: 1px dashed var(--border-flat);
+}
+
+.vote-row span {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.vote-row select {
+    width: 110px;
+    padding: 0.25rem;
+    font-size: 0.8rem;
+}
+
+/* CENTERED VIEWPORT SCALING CHASSIS */
+.canvas-viewport {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--bg-main);
     position: relative;
-    background-color: #0b0f19;
+    overflow: hidden;
+}
+
+.canvas-wrapper {
+    width: 90%;
+    height: 90%;
+    max-width: 600px;
+    max-height: 600px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -81,141 +183,136 @@ svg {
     height: 100%;
 }
 
-.control-section {
-    flex: 2;
-    background-color: var(--panel-bg);
-    border-left: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    padding: 1.5rem;
-    gap: 1.5rem;
+.canvas-badge {
+    position: absolute;
+    bottom: 1.5rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-flat);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
-.panel-card {
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.25rem;
-}
-
-.panel-card h2 {
-    font-size: 1rem;
-    margin-bottom: 1rem;
-    color: var(--text-main);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.5rem;
-}
-
-.config-row {
-    display: flex;
-    align-items: center;
-}
-
-.config-row input {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-    padding: 0.4rem;
-    border-radius: 4px;
-    width: 60px;
-    margin-left: 0.5rem;
-    outline: none;
-}
-
-.btn-group {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-button {
-    padding: 0.75rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-primary {
-    background-color: #2563eb;
-    color: white;
-    flex: 1;
-}
-
-.btn-primary:hover { background-color: #1d4ed8; }
-
-.btn-secondary {
-    background-color: var(--node-bg);
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover { background-color: var(--border-color); }
-
-.vote-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
-}
-
-.vote-row label {
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-select {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-    padding: 0.4rem 0.75rem;
-    border-radius: 4px;
-    outline: none;
-    width: 120px;
-}
-
-select:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.875rem;
-    text-align: left;
-}
-
-th, td {
-    padding: 0.6rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-th {
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
+/* GRAPH OBJECT VECTOR DATA */
 .node-circle {
-    fill: var(--node-bg);
-    stroke: var(--border-color);
-    stroke-width: 2;
-    transition: all 0.3s ease;
+    fill: var(--node-fill);
+    stroke: var(--text-primary);
+    stroke-width: 1.5;
 }
 
-.node-circle.active-leader {
-    stroke: var(--accent-p2);
-    stroke-width: 4;
+.node-circle.leader-active {
+    stroke-width: 3px;
 }
 
 .arrow-line {
     fill: none;
-    transition: stroke-width 0.4s ease, stroke 0.4s ease;
 }
 
-text {
-    user-select: none;
-    pointer-events: none;
+/* CLIMBING FLEX ANIMATED LIST LAYER */
+.table-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    margin-top: 0.5rem;
+}
+
+.animated-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    position: relative;
+}
+
+/* Header alignment properties matching structural rows */
+.leader-row-header {
+    display: grid;
+    grid-template-columns: 2.5fr 2fr 1fr 1fr;
+    padding: 0.75rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-flat);
+    letter-spacing: 0.05em;
+}
+
+/* Consolidated Leader Row Properties */
+.leader-row {
+    display: grid;
+    grid-template-columns: 2.5fr 2fr 1fr 1fr;
+    background: var(--bg-main);
+    border: 1px solid var(--border-flat);
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    align-items: center;
+    /* Clean linear-deceleration curve for seamless tracking of positional changes */
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+    will-change: transform;
+}
+
+/* FIXED: Replaced scale mutation to preserve engine's inline translateY position coordinates */
+.leader-row.rank-king {
+    border: 1px solid var(--color-p2);
+    box-shadow: inset 0 0 0 1px var(--color-p2);
+    font-weight: bold;
+    z-index: 5;
+}
+
+.leader-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Custom Scrollbar Properties */
+::-webkit-scrollbar {
+    width: 4px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+    background: #1f2937;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Floating Screen Corner Watermark Chassis */
+.floating-watermark {
+    position: fixed;
+    bottom: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+    z-index: 100;
+    pointer-events: auto;
+}
+
+.watermark-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+    opacity: 0.4;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.watermark-item svg {
+    color: var(--text-muted);
+    transition: stroke 0.15s ease;
+}
+
+.watermark-item:hover {
+    opacity: 1;
+    color: var(--color-p2);
+}
+
+.watermark-item:hover svg {
+    stroke: var(--color-p2);
 }

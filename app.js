@@ -1,41 +1,57 @@
-// System Config and State Initialization
 let peopleIds = [];
 let currentPhase = 1; 
 let state = {};
 let nodePositions = {};
+let isAutoVoting = false;
 
-const width = 600;
-const height = 500;
-const centerX = width / 2;
-const centerY = height / 2;
-const radius = 170;
-const nodeRadius = 24;
+// Token tracking engine to completely eliminate background thread leaks
+let currentExecutionToken = 0;
 
-// Preset Scenarios Data Dictionary
+const canvasSize = 600;
+const centerX = canvasSize / 2;
+const centerY = canvasSize / 2;
+const nodeRadius = 22;
+const rowHeight = 46; 
+
 const presets = {
     corporate: {
         size: 7,
-        desc: "Hierarchical Cascade: Low ranks funnel power upwards. The absolute peak executive points back to a baseline node, flipping the structure.",
+        desc: "Hierarchical Cascade: Low ranks funnel power upwards. The peak executive points back to a baseline node, flipping the structure downstream.",
         votes: { 'A':'G', 'B':'A', 'C':'A', 'D':'B', 'E':'B', 'F':'C', 'G':'D' }
     },
     tribal: {
         size: 8,
-        desc: "Echo Chambers: Faction 1 (A,B,C) locks a permanent balanced loop. Faction 2 routes all votes into dictator E, whose power shifts away.",
+        desc: "Echo Chambers: Faction 1 (A,B,C) locks a permanent loop. Faction 2 routes all votes into dictator E, whose power shifts completely out.",
         votes: { 'A':'B', 'B':'C', 'C':'A', 'D':'A', 'E':'F', 'F':'G', 'G':'H', 'H':'E' }
     },
     duopoly: {
         size: 6,
-        desc: "Bipartisan Duopoly: Members split backing to two primary figures. Those two primary figures vote exclusively for each other, locking out the room.",
+        desc: "Bipartisan Duopoly: Members split backing to two primary figures. Those two primary figures vote exclusively for each other.",
         votes: { 'A':'B', 'B':'A', 'C':'A', 'D':'A', 'E':'B', 'F':'B' }
+    },
+    coalition: {
+        size: 7,
+        desc: "Outcast Coalition: The unvoted basement tier nodes all pool their raw weights into a single unranked item to stage a phase-2 structural overthrow.",
+        votes: { 'A':'B', 'B':'C', 'C':'A', 'D':'G', 'E':'G', 'F':'G', 'G':'A' }
+    },
+    cascade: {
+        size: 6,
+        desc: "Linear Cascade Line: Power steps strictly in a sequential chain from A to F, pooling points directly into the terminal sink asset.",
+        votes: { 'A':'B', 'B':'C', 'C':'D', 'D':'E', 'E':'F', 'F':'A' }
     }
 };
+
+function cancelActiveOperations() {
+    currentExecutionToken++; 
+    isAutoVoting = false;
+}
 
 function setupPopulation(n, presetVotes = null) {
     peopleIds = [];
     state = {};
     
     for (let i = 0; i < n; i++) {
-        const id = n <= 26 ? String.fromCharCode(65 + i) : `P${i+1}`;
+        const id = n <= 26 ? String.fromCharCode(65 + i) : `N${i+1}`;
         peopleIds.push(id);
     }
 
@@ -44,19 +60,21 @@ function setupPopulation(n, presetVotes = null) {
         if (presetVotes && presetVotes[id]) {
             target = presetVotes[id];
         }
-        state[id] = { votesFor: target, p1Score: 0, p2Score: 0, rank: 1 };
+        state[id] = { id: id, votesFor: target, p1Score: 0, p2Score: 0, rank: 1 };
     });
 
-    recalculateGeometry();
+    recalculateGeometry(n);
 }
 
-function recalculateGeometry() {
+function recalculateGeometry(n) {
     nodePositions = {};
+    const dynamicRadius = Math.min(220, 130 + (n * 5));
+    
     peopleIds.forEach((id, index) => {
         const angle = (index * 2 * Math.PI) / peopleIds.length - Math.PI / 2;
         nodePositions[id] = {
-            x: centerX + radius * Math.cos(angle),
-            y: centerY + radius * Math.sin(angle)
+            x: centerX + dynamicRadius * Math.cos(angle),
+            y: centerY + dynamicRadius * Math.sin(angle)
         };
     });
 }
@@ -69,8 +87,8 @@ function initControls() {
         const row = document.createElement('div');
         row.className = 'vote-row';
         
-        const label = document.createElement('label');
-        label.innerText = `Person ${id} votes for:`;
+        const label = document.createElement('span');
+        label.innerText = `Node ${id}`;
         
         const select = document.createElement('select');
         select.id = `select-${id}`;
@@ -79,16 +97,18 @@ function initControls() {
             if (id !== targetId) { 
                 const opt = document.createElement('option');
                 opt.value = targetId;
-                opt.innerText = `Person ${targetId}`;
+                opt.innerText = `Node ${targetId}`;
                 if (state[id].votesFor === targetId) opt.selected = true;
                 select.appendChild(opt);
             }
         });
 
         select.addEventListener('change', (e) => {
+            cancelActiveOperations();
             state[id].votesFor = e.target.value;
-            document.getElementById('scenarioPresetSelect').value = 'custom';
+            document.getElementById('scenarioSelect').value = 'custom';
             document.getElementById('scenarioDesc').innerText = "Custom user layout configuration.";
+            resetControlsState(1);
             calculateSystemState();
             render();
         });
@@ -102,7 +122,10 @@ function initControls() {
 function calculateSystemState() {
     peopleIds.forEach(id => {
         state[id].p1Score = 0;
-        state[id].p2Score = 0;
+        // Do not wipe out p2Score here if we are actively building it up in Phase 2 loops
+        if (currentPhase === 1) {
+            state[id].p2Score = 0;
+        }
     });
 
     peopleIds.forEach(voterId => {
@@ -110,19 +133,88 @@ function calculateSystemState() {
         if(state[target]) state[target].p1Score += 1;
     });
 
-    const rankedList = [...peopleIds].sort((a, b) => state[b].p1Score - state[a].p1Score);
-    rankedList.forEach((id, index) => {
-        state[id].rank = index + 1;
-    });
+    if (currentPhase === 2 && !isAutoVoting) {
+        peopleIds.forEach(voterId => {
+            const target = state[voterId].votesFor;
+            const transferValue = state[voterId].p1Score; 
+            if(state[target]) state[target].p2Score += transferValue;
+        });
+    }
+}
 
-    peopleIds.forEach(voterId => {
-        const target = state[voterId].votesFor;
-        const transferValue = state[voterId].p1Score; 
-        if(state[target]) state[target].p2Score += transferValue;
+function resetControlsState(targetPhase) {
+    currentPhase = targetPhase;
+    const isP1 = currentPhase === 1;
+    
+    document.getElementById('togglePhaseBtn').innerText = isP1 ? 'Run Phase 2' : 'Return to Phase 1';
+    document.getElementById('togglePhaseBtn').disabled = false;
+    document.getElementById('phaseIndicator').innerText = isP1 ? 'Phase 1: Raw Baseline Seeds' : 'Phase 2: Recalculated Matrix Flow';
+    
+    document.getElementById('groupSizeInput').disabled = false;
+    document.getElementById('updateSizeBtn').disabled = false;
+    document.getElementById('scenarioSelect').disabled = false;
+    
+    peopleIds.forEach(id => {
+        const el = document.getElementById(`select-${id}`);
+        if (el) el.disabled = false;
     });
 }
 
+async function runAutoVote() {
+    cancelActiveOperations(); 
+    isAutoVoting = true;
+    
+    const myToken = currentExecutionToken; 
+
+    currentPhase = 1;
+    document.getElementById('scenarioSelect').value = 'custom';
+    document.getElementById('scenarioDesc').innerText = "Processing automated randomized structural allocation...";
+    document.getElementById('togglePhaseBtn').innerText = 'Run Phase 2';
+    document.getElementById('phaseIndicator').innerText = 'Phase 1: Raw Baseline Seeds';
+    
+    document.getElementById('togglePhaseBtn').disabled = true;
+    document.getElementById('groupSizeInput').disabled = true;
+    document.getElementById('updateSizeBtn').disabled = true;
+    document.getElementById('scenarioSelect').disabled = true;
+
+    // CRITICAL FIX: Ensure dropdown elements are completely re-enabled before selecting values
+    peopleIds.forEach(id => {
+        const el = document.getElementById(`select-${id}`);
+        if (el) el.disabled = false;
+    });
+
+    // Flush all calculation data cleanly before rolling random weights
+    peopleIds.forEach(id => {
+        state[id].p1Score = 0;
+        state[id].p2Score = 0;
+    });
+
+    for (let i = 0; i < peopleIds.length; i++) {
+        if (currentExecutionToken !== myToken) return; 
+
+        const voterId = peopleIds[i];
+        const validTargets = peopleIds.filter(id => id !== voterId);
+        const randomTarget = validTargets[Math.floor(Math.random() * validTargets.length)];
+        
+        state[voterId].votesFor = randomTarget;
+        const selectEl = document.getElementById(`select-${voterId}`);
+        if (selectEl) selectEl.value = randomTarget;
+
+        calculateSystemState();
+        render();
+        
+        await new Promise(resolve => setTimeout(resolve, 600));
+    }
+
+    if (currentExecutionToken !== myToken) return;
+
+    document.getElementById('scenarioDesc').innerText = "Randomized computational auto-allocations completed.";
+    isAutoVoting = false;
+    resetControlsState(1);
+}
+
 function applyPreset(presetKey) {
+    cancelActiveOperations();
     if (presetKey === 'custom') return;
     const preset = presets[presetKey];
     
@@ -131,66 +223,68 @@ function applyPreset(presetKey) {
     
     setupPopulation(preset.size, preset.votes);
     initControls();
+    resetControlsState(1);
     calculateSystemState();
-    render();
+    render(true); 
 }
 
-function togglePhase() {
+async function togglePhase() {
+    cancelActiveOperations();
+    const myToken = currentExecutionToken;
+
     if (currentPhase === 1) {
         currentPhase = 2;
-        document.getElementById('togglePhaseBtn').innerText = 'Back to Phase 1';
-        document.getElementById('phaseBadge').innerText = 'Phase 2: Weighted Flow';
-        document.getElementById('phaseBadge').className = 'phase-indicator phase-2-badge';
-        document.getElementById('groupSizeInput').disabled = true;
-        document.getElementById('updateSizeBtn').disabled = true;
-        document.getElementById('scenarioPresetSelect').disabled = true;
+        document.getElementById('togglePhaseBtn').innerText = 'Processing Matrix...';
+        document.getElementById('togglePhaseBtn').disabled = true;
+        document.getElementById('phaseIndicator').innerText = 'Phase 2: Calculating Matrix Flow...';
         
+        const elementsToDisable = ['groupSizeInput', 'updateSizeBtn', 'scenarioSelect'];
+        elementsToDisable.forEach(id => document.getElementById(id).disabled = true);
         peopleIds.forEach(id => {
-            document.getElementById(`select-${id}`).disabled = true;
+            const el = document.getElementById(`select-${id}`);
+            if (el) el.disabled = true;
         });
-    } else {
-        currentPhase = 1;
-        document.getElementById('togglePhaseBtn').innerText = 'Run Phase 2';
-        document.getElementById('phaseBadge').innerText = 'Phase 1: Raw Seeds';
-        document.getElementById('phaseBadge').className = 'phase-indicator phase-1-badge';
-        document.getElementById('groupSizeInput').disabled = false;
-        document.getElementById('updateSizeBtn').disabled = false;
-        document.getElementById('scenarioPresetSelect').disabled = false;
-        
-        peopleIds.forEach(id => {
-            document.getElementById(`select-${id}`).disabled = false;
-        });
-    }
-    render();
-}
 
-function resetSimulation() {
-    currentPhase = 1;
-    document.getElementById('togglePhaseBtn').innerText = 'Run Phase 2';
-    document.getElementById('phaseBadge').innerText = 'Phase 1: Raw Seeds';
-    document.getElementById('phaseBadge').className = 'phase-indicator phase-1-badge';
-    document.getElementById('groupSizeInput').disabled = false;
-    document.getElementById('updateSizeBtn').disabled = false;
-    document.getElementById('scenarioPresetSelect').disabled = false;
-    
-    const currentPreset = document.getElementById('scenarioPresetSelect').value;
-    if (currentPreset !== 'custom') {
-        applyPreset(currentPreset);
+        peopleIds.forEach(id => { state[id].p2Score = 0; });
+        render(); 
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        for (let i = 0; i < peopleIds.length; i++) {
+            if (currentExecutionToken !== myToken) return; 
+
+            const voterId = peopleIds[i];
+            const target = state[voterId].votesFor;
+            const transferValue = state[voterId].p1Score; 
+            
+            if (state[target] && transferValue > 0) {
+                state[target].p2Score += transferValue;
+                render();
+                await new Promise(resolve => setTimeout(resolve, 600));
+            }
+        }
+
+        if (currentExecutionToken !== myToken) return;
+        resetControlsState(2);
+
     } else {
-        setupPopulation(parseInt(document.getElementById('groupSizeInput').value) || 6);
-        initControls();
+        resetControlsState(1);
         calculateSystemState();
         render();
     }
 }
 
-function render() {
+function render(forceRebuildList = false) {
     const linksGroup = document.getElementById('linksGroup');
     const nodesGroup = document.getElementById('nodesGroup');
     
     linksGroup.innerHTML = '';
     nodesGroup.innerHTML = '';
 
+    const maxP1 = Math.max(...peopleIds.map(p => state[p].p1Score));
+    const maxP2 = Math.max(...peopleIds.map(p => state[p].p2Score));
+    const activeMax = currentPhase === 1 ? maxP1 : maxP2;
+
+    // Canvas Straight Vector Paths with Offset Shift Engine
     peopleIds.forEach(voterId => {
         const targetId = state[voterId].votesFor;
         if (!nodePositions[voterId] || !nodePositions[targetId]) return;
@@ -198,33 +292,57 @@ function render() {
         const fromPos = nodePositions[voterId];
         const toPos = nodePositions[targetId];
 
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', fromPos.x);
-        line.setAttribute('y1', fromPos.y);
-        line.setAttribute('x2', toPos.x);
-        line.setAttribute('y2', toPos.y);
+        const dx = toPos.x - fromPos.x;
+        const dy = toPos.y - fromPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance === 0) return;
+
+        // Unit Direction Vectors
+        const ux = dx / distance;
+        const uy = dy / distance;
+
+        // Perpendicular Normals for Horizontal/Vertical Lateral Translation
+        const nx = -uy;
+        const ny = ux;
+
+        // Apply a strict 8px sideways shift if nodes point at each other to avoid clipping
+        const isBidirectional = state[targetId] && state[targetId].votesFor === voterId;
+        const lateralOffset = isBidirectional ? 8 : 0;
+
+        // Compute offset start/endpoints shifting straight outwards along edge rings
+        const x1 = fromPos.x + ux * nodeRadius + nx * lateralOffset;
+        const y1 = fromPos.y + uy * nodeRadius + ny * lateralOffset;
+        const x2 = toPos.x - ux * (nodeRadius + 4) + nx * lateralOffset; 
+        const y2 = toPos.y - uy * (nodeRadius + 4) + ny * lateralOffset;
+
+        // Simple line drawing syntax using standard path lines (M -> L)
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+        path.setAttribute('fill', 'none');
         
         if (currentPhase === 1) {
-            line.setAttribute('stroke', '#38bdf8');
-            line.setAttribute('stroke-width', '2');
-            line.setAttribute('marker-end', 'url(#arrowhead-p1)');
+            path.setAttribute('stroke', '#f8fafc');
+            path.setAttribute('stroke-width', '1.5');
+            path.setAttribute('marker-end', 'url(#arrow-p1)');
         } else {
             const weight = state[voterId].p1Score;
             if (weight === 0) {
-                line.setAttribute('stroke', '#475569');
-                line.setAttribute('stroke-width', '1');
-                line.setAttribute('stroke-dasharray', '4,4');
-                line.setAttribute('marker-end', 'url(#arrowhead-dead)');
+                path.setAttribute('stroke', '#334155');
+                path.setAttribute('stroke-width', '1');
+                path.setAttribute('stroke-dasharray', '3,3');
+                path.setAttribute('marker-end', 'url(#arrow-dead)');
             } else {
-                line.setAttribute('stroke', '#fbbf24');
-                line.setAttribute('stroke-width', 2 + weight * 1.5);
-                line.setAttribute('marker-end', 'url(#arrowhead-p2)');
+                path.setAttribute('stroke', '#3b82f6');
+                path.setAttribute('stroke-width', 1.5 + weight * 1.25);
+                path.setAttribute('marker-end', 'url(#arrow-p2)');
             }
         }
-        line.className.baseVal = 'arrow-line';
-        linksGroup.appendChild(line);
+        path.className.baseVal = 'arrow-line';
+        linksGroup.appendChild(path);
     });
 
+    // Canvas Nodes
     peopleIds.forEach(id => {
         const pos = nodePositions[id];
         const item = state[id];
@@ -238,17 +356,17 @@ function render() {
         circle.setAttribute('r', nodeRadius);
         circle.className.baseVal = 'node-circle';
         
-        const maxScore = Math.max(...peopleIds.map(p => currentPhase === 1 ? state[p].p1Score : state[p].p2Score));
-        if (activeScore === maxScore && maxScore > 0) {
-            circle.classList.add('active-leader');
+        if (activeScore === activeMax && activeMax > 0) {
+            circle.classList.add('leader-active');
+            circle.setAttribute('stroke', currentPhase === 1 ? '#f8fafc' : '#3b82f6');
         }
 
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         label.setAttribute('x', pos.x);
-        label.setAttribute('y', pos.y - 3);
+        label.setAttribute('y', pos.y - 2);
         label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('fill', '#ffffff');
-        label.setAttribute('font-weight', 'bold');
+        label.setAttribute('fill', '#f8fafc');
+        label.setAttribute('font-weight', '700');
         label.setAttribute('font-size', '11px');
         label.textContent = id;
 
@@ -256,10 +374,10 @@ function render() {
         valText.setAttribute('x', pos.x);
         valText.setAttribute('y', pos.y + 11);
         valText.setAttribute('text-anchor', 'middle');
-        valText.setAttribute('fill', currentPhase === 1 ? '#38bdf8' : '#fbbf24');
+        valText.setAttribute('fill', currentPhase === 1 ? '#64748b' : '#3b82f6');
         valText.setAttribute('font-size', '10px');
         valText.setAttribute('font-weight', '600');
-        valText.textContent = `S: ${activeScore}`;
+        valText.textContent = activeScore;
 
         g.appendChild(circle);
         g.appendChild(label);
@@ -267,43 +385,84 @@ function render() {
         nodesGroup.appendChild(g);
     });
 
-    const tbody = document.getElementById('leaderboardBody');
-    tbody.innerHTML = '';
+    // Leaderboard List
+    const listContainer = document.getElementById('leaderboardRowsContainer');
     
-    const sorted = [...peopleIds].sort((a, b) => {
+    const sortedData = [...peopleIds].sort((a, b) => {
         const scoreA = currentPhase === 1 ? state[a].p1Score : state[a].p2Score;
         const scoreB = currentPhase === 1 ? state[b].p1Score : state[b].p2Score;
-        return scoreB - scoreA;
+        return (scoreB - scoreA) || a.localeCompare(b);
     });
 
-    sorted.forEach(id => {
-        const tr = document.createElement('tr');
-        if (currentPhase === 2 && state[id].p2Score === Math.max(...peopleIds.map(p => state[p].p2Score))) {
-            tr.style.backgroundColor = 'rgba(251, 191, 36, 0.08)';
-        }
+    if (listContainer.children.length !== peopleIds.length || forceRebuildList) {
+        listContainer.innerHTML = '';
+        listContainer.style.height = `${sortedData.length * rowHeight}px`;
         
-        tr.innerHTML = `
-            <td style="font-weight: bold;">Person ${id}</td>
-            <td>➔ Person ${state[id].votesFor}</td>
-            <td style="color: var(--accent-p1); font-weight: 600;">${state[id].p1Score}</td>
-            <td style="color: var(--accent-p2); font-weight: 600;">${state[id].p2Score}</td>
-            <td><span style="background: #475569; padding: 2px 6px; border-radius:4px; font-size:11px;">#${state[id].rank}</span></td>
-        `;
-        tbody.appendChild(tr);
+        sortedData.forEach((id, index) => {
+            const row = document.createElement('div');
+            row.className = 'leader-row';
+            row.id = `lead-row-${id}`;
+            row.style.position = 'absolute';
+            row.style.width = '100%';
+            row.style.transform = `translateY(${index * rowHeight}px)`;
+            
+            row.innerHTML = `
+                <span class="node-name">Node ${id}</span>
+                <span class="node-target" style="color: var(--text-muted);">➔ ${state[id].votesFor}</span>
+                <span class="p1-val">${state[id].p1Score}</span>
+                <span class="p2-val" style="color: var(--text-muted);">${state[id].p2Score}</span>
+            `;
+            listContainer.appendChild(row);
+        });
+        return;
+    }
+
+    sortedData.forEach((id, index) => {
+        const row = document.getElementById(`lead-row-${id}`);
+        if (!row) return;
+
+        row.style.transitionDelay = `${index * 40}ms`;
+        row.style.transform = `translateY(${index * rowHeight}px)`;
+        
+        row.querySelector('.node-target').innerText = `➔ ${state[id].votesFor}`;
+        row.querySelector('.p1-val').innerText = state[id].p1Score;
+        
+        const p2Span = row.querySelector('.p2-val');
+        p2Span.innerText = state[id].p2Score;
+        p2Span.style.color = state[id].p2Score > 0 ? 'var(--color-p2)' : 'var(--text-muted)';
+
+        const activeScore = currentPhase === 1 ? state[id].p1Score : state[id].p2Score;
+        if (index === 0 && activeScore === activeMax && activeMax > 0) {
+            row.classList.add('rank-king');
+        } else {
+            row.classList.remove('rank-king');
+        }
     });
 }
-
 window.onload = () => {
     setupPopulation(6);
     initControls();
     calculateSystemState();
-    render();
+    render(true);
 
     document.getElementById('togglePhaseBtn').addEventListener('click', togglePhase);
-    document.getElementById('resetBtn').addEventListener('click', resetSimulation);
-    document.getElementById('scenarioPresetSelect').addEventListener('change', (e) => applyPreset(e.target.value));
+    document.getElementById('autoVoteBtn').addEventListener('click', runAutoVote);
+    document.getElementById('scenarioSelect').addEventListener('change', (e) => applyPreset(e.target.value));
+    
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        cancelActiveOperations();
+        document.getElementById('scenarioSelect').value = 'custom';
+        document.getElementById('scenarioDesc').innerText = "Custom user layout configuration.";
+        setupPopulation(parseInt(document.getElementById('groupSizeInput').value) || 6);
+        initControls();
+        resetControlsState(1);
+        calculateSystemState();
+        render(true);
+    });
+
     document.getElementById('updateSizeBtn').addEventListener('click', () => {
-        document.getElementById('scenarioPresetSelect').value = 'custom';
+        cancelActiveOperations();
+        document.getElementById('scenarioSelect').value = 'custom';
         document.getElementById('scenarioDesc').innerText = "Custom user layout configuration.";
         const sizeInput = document.getElementById('groupSizeInput');
         let val = parseInt(sizeInput.value);
@@ -313,7 +472,8 @@ window.onload = () => {
         
         setupPopulation(val);
         initControls();
+        resetControlsState(1);
         calculateSystemState();
-        render();
+        render(true);
     });
 };

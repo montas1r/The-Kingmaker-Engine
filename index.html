@@ -3,88 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Kingmaker Engine - Scenario Simulator</title>
+    <title>The Kingmaker Engine</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <header>
-        <h1>The Kingmaker Engine (Endogenous PageRank)</h1>
-        <div id="phaseBadge" class="phase-indicator phase-1-badge">Phase 1: Raw Seeds</div>
-    </header>
-
-    <div class="main-container">
-        <div class="canvas-section">
-            <svg id="networkSvg">
-                <defs>
-                    <marker id="arrowhead-p1" markerWidth="10" markerHeight="7" refX="23" refY="3.5" orient="auto">
-                        <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
-                    </marker>
-                    <marker id="arrowhead-p2" markerWidth="8" markerHeight="6" refX="16" refY="3" orient="auto">
-                        <polygon points="0 0, 8 3, 0 6" fill="#fbbf24" />
-                    </marker>
-                    <marker id="arrowhead-dead" markerWidth="6" markerHeight="4" refX="23" refY="2" orient="auto">
-                        <polygon points="0 0, 6 2, 0 4" fill="#475569" />
-                    </marker>
-                </defs>
-                <g id="linksGroup"></g>
-                <g id="nodesGroup"></g>
-            </svg>
-        </div>
-
-        <div class="control-section">
-            <div class="panel-card">
-                <h2>Preset Scenarios</h2>
-                <select id="scenarioPresetSelect" style="width: 100%; margin-bottom: 0.5rem;">
+    <div class="app-shell">
+        <aside class="sidebar-left">
+            <div class="brand">THE KINGMAKER ENGINE</div>
+            
+            <div class="control-group">
+                <label>Preset Scenarios</label>
+                <select id="scenarioSelect">
                     <option value="custom">Custom Configuration</option>
-                    <option value="corporate">Corporate Pyramid (Waterfall)</option>
+                    <option value="corporate">Corporate Pyramid</option>
                     <option value="tribal">Tribal Echo Chambers</option>
                     <option value="duopoly">Bipartisan Duopoly</option>
+                    <option value="coalition">Outcast Coalition</option>
+                    <option value="cascade">Linear Cascade Line</option>
                 </select>
-                <p id="scenarioDesc" style="font-size: 0.8rem; color: var(--text-muted); italic">Select a preset to inject historical structural layouts.</p>
+                <div id="scenarioDesc" class="meta-desc">Custom user layout configuration.</div>
             </div>
 
-            <div class="panel-card">
-                <h2>Network Configuration</h2>
-                <div class="config-row">
-                    <label for="groupSizeInput">Group Size (n):</label>
+            <div class="control-group">
+                <label>System Scale (n)</label>
+                <div class="input-row">
                     <input type="number" id="groupSizeInput" min="3" max="20" value="6">
-                    <button class="btn-secondary" id="updateSizeBtn" style="padding: 0.4rem; margin-left: 0.5rem;">Apply</button>
+                    <button id="updateSizeBtn" class="btn-flat">Apply</button>
                 </div>
             </div>
 
-            <div class="panel-card">
-                <h2>Simulation Control</h2>
-                <div class="btn-group">
-                    <button class="btn-primary" id="togglePhaseBtn">Run Phase 2</button>
-                    <button class="btn-secondary" id="resetBtn">Reset</button>
+            <div class="control-group">
+                <label>Simulation Control</label>
+                <button id="togglePhaseBtn" class="btn-action">Run Phase 2</button>
+                <div class="dual-buttons">
+                    <button id="autoVoteBtn" class="btn-flat">Auto-Vote</button>
+                    <button id="resetBtn" class="btn-flat">Reset</button>
                 </div>
-                <p id="helpText" style="font-size: 0.8rem; color: var(--text-muted);">
-                    Phase 1: Configure who each person votes for. Every vote counts as 1 point.
-                </p>
             </div>
 
-            <div class="panel-card">
-                <h2>Configure Target Allocations</h2>
+            <div class="control-group scrollable">
+                <label>Manual Voting Track Matrix</label>
                 <div id="voteInputsContainer"></div>
             </div>
+        </aside>
 
-            <div class="panel-card">
-                <h2>Live Matrix Leaderboard</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Person</th>
-                            <th>Target</th>
-                            <th>P1 Raw</th>
-                            <th>P2 Weight</th>
-                            <th>Rank</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboardBody"></tbody>
-                </table>
+        <main class="canvas-viewport">
+            <div class="canvas-wrapper">
+                <svg id="networkSvg" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <marker id="arrow-p1" markerWidth="8" markerHeight="6" refX="24" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" fill="#f8fafc" />
+                        </marker>
+                        <marker id="arrow-p2" markerWidth="8" markerHeight="6" refX="24" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" />
+                        </marker>
+                        <marker id="arrow-dead" markerWidth="6" markerHeight="4" refX="24" refY="2" orient="auto">
+                            <polygon points="0 0, 6 2, 0 4" fill="#334155" />
+                        </marker>
+                    </defs>
+                    <g id="linksGroup"></g>
+                    <g id="nodesGroup"></g>
+                </svg>
             </div>
-        </div>
+            <div id="phaseIndicator" class="canvas-badge">Phase 1: Raw Baseline Seeds</div>
+        </main>
+
+        <aside class="sidebar-right">
+            <label class="panel-title">Matrix Leaderboard</label>
+            <div class="table-wrapper">
+                <div class="leader-row-header">
+                    <span>Node</span>
+                    <span>Link</span>
+                    <span>Raw</span>
+                    <span>Weight</span>
+                </div>
+                <div id="leaderboardRowsContainer" class="animated-list"></div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="floating-watermark">
+        <a href="https://github.com/montas1r" target="_blank" class="watermark-item">
+            <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+            <span>montas1r</span>
+        </a>
+        <a href="https://instagram.com/monumeeent" target="_blank" class="watermark-item">
+            <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            <span>@monumeeent</span>
+        </a>
     </div>
 
     <script src="app.js"></script>
