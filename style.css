@@ -107,6 +107,22 @@ svg {
     padding-bottom: 0.5rem;
 }
 
+.config-row {
+    display: flex;
+    align-items: center;
+}
+
+.config-row input {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    padding: 0.4rem;
+    border-radius: 4px;
+    width: 60px;
+    margin-left: 0.5rem;
+    outline: none;
+}
+
 .btn-group {
     display: flex;
     gap: 0.75rem;
@@ -114,7 +130,6 @@ svg {
 }
 
 button {
-    flex: 1;
     padding: 0.75rem;
     border: none;
     border-radius: 6px;
@@ -126,6 +141,7 @@ button {
 .btn-primary {
     background-color: #2563eb;
     color: white;
+    flex: 1;
 }
 
 .btn-primary:hover { background-color: #1d4ed8; }

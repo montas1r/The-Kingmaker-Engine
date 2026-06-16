@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recursive Locked-Network Voting Visualizer</title>
+    <title>The Kingmaker Engine - Custom Network Visualizer</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header>
-        <h1>Locked-Network Voting Visualizer (n = 6)</h1>
+        <h1>The Kingmaker Engine (Endogenous PageRank)</h1>
         <div id="phaseBadge" class="phase-indicator phase-1-badge">Phase 1: Raw Seeds</div>
     </header>
 
@@ -33,6 +33,15 @@
         </div>
 
         <div class="control-section">
+            <div class="panel-card">
+                <h2>Network Configuration</h2>
+                <div class="config-row">
+                    <label for="groupSizeInput">Group Size (n):</label>
+                    <input type="number" id="groupSizeInput" min="3" max="20" value="6">
+                    <button class="btn-secondary" id="updateSizeBtn" style="padding: 0.4rem; margin-left: 0.5rem;">Apply</button>
+                </div>
+            </div>
+
             <div class="panel-card">
                 <h2>Simulation Control</h2>
                 <div class="btn-group">

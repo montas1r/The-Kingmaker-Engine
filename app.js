@@ -1,35 +1,49 @@
 // System Config and State Initialization
-const peopleIds = ['A', 'B', 'C', 'D', 'E', 'F'];
-let currentPhase = 1; // 1 = Raw votes, 2 = Rank-weighted scores
+let peopleIds = [];
+let currentPhase = 1; 
+let state = {};
+let nodePositions = {};
 
-// Initial state default setup to create an interesting pattern automatically
-let state = {
-    'A': { votesFor: 'B', p1Score: 0, p2Score: 0, rank: 1 },
-    'B': { votesFor: 'C', p1Score: 0, p2Score: 0, rank: 1 },
-    'C': { votesFor: 'A', p1Score: 0, p2Score: 0, rank: 1 },
-    'D': { votesFor: 'A', p1Score: 0, p2Score: 0, rank: 4 },
-    'E': { votesFor: 'B', p1Score: 0, p2Score: 0, rank: 4 },
-    'F': { votesFor: 'C', p1Score: 0, p2Score: 0, rank: 4 }
-};
-
-// Graph geometry coordinates
+// Canvas geometry variables
 const width = 600;
 const height = 500;
 const centerX = width / 2;
 const centerY = height / 2;
 const radius = 170;
-const nodeRadius = 26;
+const nodeRadius = 24;
 
-const nodePositions = {};
-peopleIds.forEach((id, index) => {
-    const angle = (index * 2 * Math.PI) / peopleIds.length - Math.PI / 2;
-    nodePositions[id] = {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle)
-    };
-});
+// Generate identifiers dynamically based on user selection size
+function setupPopulation(n) {
+    peopleIds = [];
+    state = {};
+    
+    for (let i = 0; i < n; i++) {
+        // Fallback to P1, P2 style strings if n goes past English character limits
+        const id = n <= 26 ? String.fromCharCode(65 + i) : `P${i+1}`;
+        peopleIds.push(id);
+    }
 
-// Initialize UI Elements
+    // Default connection loop behavior to prevent broken rendering on initialization
+    peopleIds.forEach((id, index) => {
+        const nextTarget = peopleIds[(index + 1) % peopleIds.length];
+        state[id] = { votesFor: nextTarget, p1Score: 0, p2Score: 0, rank: 1 };
+    });
+
+    recalculateGeometry();
+}
+
+function recalculateGeometry() {
+    nodePositions = {};
+    peopleIds.forEach((id, index) => {
+        const angle = (index * 2 * Math.PI) / peopleIds.length - Math.PI / 2;
+        nodePositions[id] = {
+            x: centerX + radius * Math.cos(angle),
+            y: centerY + radius * Math.sin(angle)
+        };
+    });
+}
+
+// Initialize UI Elements Dropdown Inputs
 function initControls() {
     const container = document.getElementById('voteInputsContainer');
     container.innerHTML = '';
@@ -45,7 +59,7 @@ function initControls() {
         select.id = `select-${id}`;
         
         peopleIds.forEach(targetId => {
-            if (id !== targetId) { // Prevent self-voting
+            if (id !== targetId) { 
                 const opt = document.createElement('option');
                 opt.value = targetId;
                 opt.innerText = `Person ${targetId}`;
@@ -64,32 +78,25 @@ function initControls() {
         row.appendChild(select);
         container.appendChild(row);
     });
-
-    document.getElementById('togglePhaseBtn').addEventListener('click', togglePhase);
-    document.getElementById('resetBtn').addEventListener('click', resetSimulation);
 }
 
 // Calculation System Core Logic
 function calculateSystemState() {
-    // Reset scores
     peopleIds.forEach(id => {
         state[id].p1Score = 0;
         state[id].p2Score = 0;
     });
 
-    // Calculate Phase 1 Raw Incoming Votes
     peopleIds.forEach(voterId => {
         const target = state[voterId].votesFor;
         if(state[target]) state[target].p1Score += 1;
     });
 
-    // Process rankings dynamically based on Phase 1 scores
     const rankedList = [...peopleIds].sort((a, b) => state[b].p1Score - state[a].p1Score);
     rankedList.forEach((id, index) => {
         state[id].rank = index + 1;
     });
 
-    // Calculate Phase 2 Network Inflow (Locked Tracks Engine)
     peopleIds.forEach(voterId => {
         const target = state[voterId].votesFor;
         const transferValue = state[voterId].p1Score; 
@@ -104,8 +111,9 @@ function togglePhase() {
         document.getElementById('phaseBadge').innerText = 'Phase 2: Weighted Flow';
         document.getElementById('phaseBadge').className = 'phase-indicator phase-2-badge';
         document.getElementById('helpText').innerText = 'Phase 2 Active. Handles locked paths. Arrow sizes scale matching Phase 1 baseline values.';
+        document.getElementById('groupSizeInput').disabled = true;
+        document.getElementById('updateSizeBtn').disabled = true;
         
-        // Lock Inputs
         peopleIds.forEach(id => {
             document.getElementById(`select-${id}`).disabled = true;
         });
@@ -115,8 +123,9 @@ function togglePhase() {
         document.getElementById('phaseBadge').innerText = 'Phase 1: Raw Seeds';
         document.getElementById('phaseBadge').className = 'phase-indicator phase-1-badge';
         document.getElementById('helpText').innerText = 'Phase 1 Active. Configure raw configurations manually.';
+        document.getElementById('groupSizeInput').disabled = false;
+        document.getElementById('updateSizeBtn').disabled = false;
         
-        // Unlock Inputs
         peopleIds.forEach(id => {
             document.getElementById(`select-${id}`).disabled = false;
         });
@@ -129,26 +138,27 @@ function resetSimulation() {
     document.getElementById('togglePhaseBtn').innerText = 'Run Phase 2';
     document.getElementById('phaseBadge').innerText = 'Phase 1: Raw Seeds';
     document.getElementById('phaseBadge').className = 'phase-indicator phase-1-badge';
+    document.getElementById('groupSizeInput').disabled = false;
+    document.getElementById('updateSizeBtn').disabled = false;
     
-    peopleIds.forEach(id => {
-        document.getElementById(`select-${id}`).disabled = false;
-    });
+    setupPopulation(parseInt(document.getElementById('groupSizeInput').value) || 6);
+    initControls();
     calculateSystemState();
     render();
 }
 
-// Render Graphics Engine (SVG Vector Map updates)
+// Render Graphics Engine
 function render() {
-    const svg = document.getElementById('networkSvg');
     const linksGroup = document.getElementById('linksGroup');
     const nodesGroup = document.getElementById('nodesGroup');
     
     linksGroup.innerHTML = '';
     nodesGroup.innerHTML = '';
 
-    // 1. Render Path Vectors (Arrows)
     peopleIds.forEach(voterId => {
         const targetId = state[voterId].votesFor;
+        if (!nodePositions[voterId] || !nodePositions[targetId]) return;
+        
         const fromPos = nodePositions[voterId];
         const toPos = nodePositions[targetId];
 
@@ -179,7 +189,6 @@ function render() {
         linksGroup.appendChild(line);
     });
 
-    // 2. Render Node Elements
     peopleIds.forEach(id => {
         const pos = nodePositions[id];
         const item = state[id];
@@ -200,19 +209,19 @@ function render() {
 
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         label.setAttribute('x', pos.x);
-        label.setAttribute('y', pos.y - 4);
+        label.setAttribute('y', pos.y - 3);
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('fill', '#ffffff');
         label.setAttribute('font-weight', 'bold');
-        label.setAttribute('font-size', '14px');
+        label.setAttribute('font-size', '12px');
         label.textContent = id;
 
         const valText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         valText.setAttribute('x', pos.x);
-        valText.setAttribute('y', pos.y + 14);
+        valText.setAttribute('y', pos.y + 11);
         valText.setAttribute('text-anchor', 'middle');
         valText.setAttribute('fill', currentPhase === 1 ? '#38bdf8' : '#fbbf24');
-        valText.setAttribute('font-size', '11px');
+        valText.setAttribute('font-size', '10px');
         valText.setAttribute('font-weight', '600');
         valText.textContent = `S: ${activeScore}`;
 
@@ -222,7 +231,6 @@ function render() {
         nodesGroup.appendChild(g);
     });
 
-    // 3. Render Data Table Rows
     const tbody = document.getElementById('leaderboardBody');
     tbody.innerHTML = '';
     
@@ -249,9 +257,25 @@ function render() {
     });
 }
 
-// Boot system startup
+// Global Event Listeners Setup
 window.onload = () => {
+    setupPopulation(6);
     initControls();
     calculateSystemState();
     render();
+
+    document.getElementById('togglePhaseBtn').addEventListener('click', togglePhase);
+    document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+    document.getElementById('updateSizeBtn').addEventListener('click', () => {
+        const sizeInput = document.getElementById('groupSizeInput');
+        let val = parseInt(sizeInput.value);
+        if (isNaN(val) || val < 3) val = 3;
+        if (val > 20) val = 20; 
+        sizeInput.value = val;
+        
+        setupPopulation(val);
+        initControls();
+        calculateSystemState();
+        render();
+    });
 };
